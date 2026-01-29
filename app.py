@@ -1,56 +1,20 @@
-import os
-import sqlite3
-import pandas as pd
 import streamlit as st
+import requests
+import pandas as pd
 
 # =====================
-# 🔹 DATABASE
+# 🔹 FASTAPI CONFIG
 # =====================
-DB_PATH = os.path.join(os.path.dirname(__file__), "data/logements.db")
+API_URL = "http://127.0.0.1:8000/logements"
 
-def get_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    return sqlite3.connect(DB_PATH)
-
-def normalize_type_bien(type_bien):
-    if not type_bien:
-        return None
-    t = type_bien.strip().upper()
-    if "STUDIO" in t: return "STUDIO"
-    if "T1" in t: return "T1"
-    if "T2" in t: return "T2"
-    if "T3" in t: return "T3"
-    return t
-
-def get_logements(ville=None, surface_min=None, type_bien=None, prix_max=None):
-    conn = get_connection()
-    c = conn.cursor()
-    query = "SELECT * FROM logements WHERE 1=1"
-    params = []
-
-    if ville:
-        query += " AND ville LIKE ?"
-        params.append(f"%{ville}%")
-    if surface_min:
-        query += " AND surface >= ?"
-        params.append(surface_min)
-    if type_bien:
-        query += " AND type_bien = ?"
-        params.append(normalize_type_bien(type_bien))
-    if prix_max:
-        query += " AND prix <= ?"
-        params.append(prix_max)
-
-    c.execute(query, params)
-    rows = c.fetchall()
-    conn.close()
-
-    df = pd.DataFrame(rows, columns=[
-        "id","titre","prix","surface","prix_m2",
-        "type_bien","ville","site_source","image","url","date_scraping"
-    ])
-    df = df[(df['prix'] > 100) & (df['surface'] > 10) & (df['prix_m2'] > 5)]
-    return df
+def fetch_logements(params):
+    try:
+        r = requests.get(API_URL, params=params, timeout=10)
+        r.raise_for_status()
+        return pd.DataFrame(r.json())
+    except Exception as e:
+        st.error("❌ Impossible de récupérer les données depuis l’API")
+        st.stop()
 
 # =====================
 # 🎨 STREAMLIT CONFIG
@@ -80,34 +44,42 @@ body { background: #f2f2f2; }
 .badge.T1 { background:#dbeafe; }
 .badge.T2 { background:#dcfce7; }
 .badge.T3 { background:#ede9fe; }
-a.button { display:inline-block; margin-top:8px; padding:6px 12px; border-radius:8px; background:#111; color:white !important; font-size:12px; font-weight:600; text-decoration:none; }
+a.button {
+    display:inline-block;
+    margin-top:8px;
+    padding:6px 12px;
+    border-radius:8px;
+    background:#111;
+    color:white !important;
+    font-size:12px;
+    font-weight:600;
+    text-decoration:none;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # =====================
-# 🔹 PAGE 1 : Accueil
+# 🔹 NAVIGATION
 # =====================
 if "page" not in st.session_state:
     st.session_state.page = 1
 
+# =====================
+# 🔹 PAGE 1 : Recherche
+# =====================
 if st.session_state.page == 1:
     st.title("👋 Hello, student!")
-    st.subheader("How can I help you? What's the housing you are looking for?")
-    
-    # Formulaire
-    with st.form("search_form"):
-        conn = get_connection()
-        try:
-            villes_dispo = pd.read_sql("SELECT DISTINCT ville FROM logements", conn)["ville"].tolist()
-        except:
-            villes_dispo = []
-        conn.close()
+    st.subheader("Find the best student housing for you")
 
-        ville = st.selectbox("Ville", [""] + villes_dispo)
-        type_bien = st.selectbox("Type de bien", ["", "STUDIO","T1","T2","T3"])
+    with st.form("search_form"):
+        ville = st.selectbox(
+            "Ville",
+            ["", "Paris", "Marseille", "Lyon", "Bordeaux", "Lille", "Toulouse"]
+        )
+        type_bien = st.selectbox("Type de bien", ["", "STUDIO", "T1", "T2", "T3"])
         surface_min = st.slider("Surface minimale (m²)", 0, 80, 0)
         prix_max = st.number_input("Budget maximum (€)", min_value=0, value=1000)
-        
+
         submit = st.form_submit_button("🔎 Rechercher")
 
     if submit:
@@ -125,15 +97,16 @@ if st.session_state.page == 1:
 # =====================
 if st.session_state.page == 2:
     params = st.session_state.search_params
-    df = get_logements(**params)
-    df = df.sort_values(by="prix", ascending=True).reset_index(drop=True)
+    df = fetch_logements(params)
 
-    st.title("🏠 Voici les logements les moins chers pour vous")
+    st.title("🏠 Best offers for you")
     st.caption(f"{len(df)} logements trouvés")
 
-    if len(df) == 0:
+    if df.empty:
         st.warning("Aucun logement trouvé pour ces critères.")
     else:
+        df = df.sort_values(by="prix")
+
         cols = st.columns(3)
         for i, row in df.iterrows():
             col = cols[i % 3]
@@ -149,6 +122,6 @@ if st.session_state.page == 2:
                 </div>
                 """, unsafe_allow_html=True)
 
-    if st.button("🔙 Rechercher autre chose"):
+    if st.button("🔙 Nouvelle recherche"):
         st.session_state.page = 1
         st.experimental_rerun()

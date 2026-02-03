@@ -90,7 +90,7 @@ if st.session_state.page == 1:
             "prix_max": prix_max if prix_max > 0 else None
         }
         st.session_state.page = 2
-        st.experimental_rerun()
+        st.rerun()
 
 # =====================
 # 🔹 PAGE 2 : Résultats
@@ -124,4 +124,4 @@ if st.session_state.page == 2:
 
     if st.button("🔙 Nouvelle recherche"):
         st.session_state.page = 1
-        st.experimental_rerun()
+        st.rerun()

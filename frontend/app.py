@@ -5,7 +5,9 @@ import pandas as pd
 # =====================
 # 🔹 FASTAPI CONFIG
 # =====================
-API_URL = "http://127.0.0.1:8000/logements"
+# 🔹 FASTAPI CONFIG
+API_URL = "http://backend:8000/logements"
+
 
 def fetch_logements(params):
     try:

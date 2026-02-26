@@ -1,12 +1,13 @@
 import streamlit as st
 import requests
 import pandas as pd
-import os
+
 # =====================
 # 🔹 FASTAPI CONFIG
 # =====================
 # 🔹 FASTAPI CONFIG
-API_URL = os.getenv("API_URL", "http://backend:8000/logements")
+API_URL = "http://backend:8000/logements"
+
 
 def fetch_logements(params):
     try:

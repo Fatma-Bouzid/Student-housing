@@ -12,7 +12,7 @@ import os
 # ----------------------------
 # CHEMIN DB
 # ----------------------------
-DB_PATH = os.path.join(os.path.dirname(__file__), "data/logements.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "../data/logements.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 # ----------------------------
@@ -65,7 +65,7 @@ def create_table():
 # ----------------------------
 def scrape_immojeune_zone(url_zone, ville_nom):
     driver = webdriver.Chrome()
-    wait = WebDriverWait(driver, 15)
+    wait = WebDriverWait(driver, 30)
     driver.get(url_zone)
 
     # Accepter les cookies si besoin
@@ -165,7 +165,7 @@ def scrape_studapart_zone(url_zone, ville_nom):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(2)
 
-    items = driver.find_elements(By.CSS_SELECTOR, "a.AccomodationBlock")
+    items = driver.find_elements(By.CSS_SELECTOR, "a.AccomodationBlock")  # OK
     data_zone = []
 
     for item in items:
@@ -175,7 +175,7 @@ def scrape_studapart_zone(url_zone, ville_nom):
 
             # Image
             try:
-                style = item.find_element(By.CSS_SELECTOR, ".SliderSimple_imageBackground").get_attribute("style")
+                style = item.find_element(By.CSS_SELECTOR, ".AccomodationBlock_image").get_attribute("style")
                 image = re.search(r'url\("(.*?)"\)', style).group(1)
             except:
                 image = None
@@ -189,7 +189,7 @@ def scrape_studapart_zone(url_zone, ville_nom):
                     prix = int(prix_text)
             except: pass
 
-            # Surface
+            # Surface (si disponible)
             surface = None
             try:
                 surface_text = item.find_element(By.CSS_SELECTOR, "div.AccomodationBlock_location.mb-10").text
@@ -198,18 +198,19 @@ def scrape_studapart_zone(url_zone, ville_nom):
 
             # Type de bien
             type_bien = None
-            if "studio" in titre.lower() or "studio" in surface_text.lower():
+            if "studio" in titre.lower() or (surface_text and "studio" in surface_text.lower()):
                 type_bien = "STUDIO"
-            elif "1 chambre" in surface_text.lower():
+            elif surface_text and "1 chambre" in surface_text.lower():
                 type_bien = "T1"
-            elif "2 chambres" in surface_text.lower():
+            elif surface_text and "2 chambres" in surface_text.lower():
                 type_bien = "T2"
-            elif "3 chambres" in surface_text.lower():
+            elif surface_text and "3 chambres" in surface_text.lower():
                 type_bien = "T3"
 
             if prix and surface and type_bien:
                 data_zone.append((titre, prix, surface, round(prix/surface,2), type_bien, ville_nom, "Studapart", image, url_annonce, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        except:
+        except Exception as e:
+            print("Erreur sur une annonce :", e)
             continue
 
     driver.quit()
